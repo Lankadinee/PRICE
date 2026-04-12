@@ -48,12 +48,17 @@ model = RegressionModel(n_join_col=max_n_join_col, n_fanout=max_n_fanout, n_tabl
                         hist_dim=args.bin_size, table_dim=args.table_dim, filter_dim=args.filter_dim,
                         query_hidden_dim=args.query_hidden_dim, final_hidden_dim=args.final_hidden_dim, output_dim=args.output_dim,
                         n_embd=args.n_embd, n_layers=args.n_layers, n_heads=args.n_heads, dropout_rate=args.dropout_rate).to(device)
-model = nn.DataParallel(model, device_ids=[0, 1, 2, 3, 4, 5, 6, 7])
+n_gpus = torch.cuda.device_count()
+device_ids = list(range(n_gpus)) if n_gpus > 0 else None
+if device_ids:
+    model = nn.DataParallel(model, device_ids=device_ids)
+else:
+    model = nn.DataParallel(model)
 
 # load pretrain parameters
 model_path = f'{current_dir}/results/model_params.pth'
 print(f"load model from {model_path}")
-model.load_state_dict(torch.load(model_path))
+model.load_state_dict(torch.load(model_path, map_location=device))
 
 optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd)
 scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, steps_per_epoch=10, epochs=10, pct_start=0.3, div_factor=2, anneal_strategy='cos', verbose=True)
@@ -73,6 +78,7 @@ for epoch in range(args.epochs):
         n_filter_col = n_filter_col.to(torch.float).to(device).view(-1, 1)
         pg_est_card = pg_est_card.to(torch.float).to(device).view(-1, 1)
         pg_est_card = torch.log(pg_est_card + 1) + 1
+        padding_mask = padding_mask.to(device)
         label = torch.log(label.to(torch.float).to(device) + 1) + 1
         label = label.view(1, -1)
 

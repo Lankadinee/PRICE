@@ -47,7 +47,10 @@ def create_workloads_features(filename, database, bin_size, usage):
             continue
 
         start_time = time.time()
-        ret = sql2feature.create_sql_features(lower_except_quotes(sql))
+        try:
+            ret = sql2feature.create_sql_features(lower_except_quotes(sql))
+        except (KeyError, ValueError, IndexError, AttributeError):
+            continue
         if ret is None:
             continue
 
