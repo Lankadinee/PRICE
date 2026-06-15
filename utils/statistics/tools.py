@@ -55,6 +55,7 @@ def load_tbls_cols_types(folder_path, db):
 
 TPCH_SKEWED_PARQUET_DIR = "/home/student.unimelb.edu.au/lrathuwadu/cardinality-estimation-data/original_data/tpch_skewed"
 TPCH_UNIFORM_PARQUET_DIR = "/home/student.unimelb.edu.au/lrathuwadu/cardinality-estimation-data/original_data/tpch_uniform_sf1"
+IMDB_PARQUET_DIR = "/datadrive500/cardinality-estimation-data/processed_data/imdb"
 
 # Free-text / admin columns to drop from every table before any stats/feature
 # work. None of these are referenced by the TPC-H workloads we run.
@@ -94,6 +95,7 @@ def load_table_datas(folder_path, db, abbrev, tbls_cols_types):
     _parquet_dir = {
         "tpch_skewed": TPCH_SKEWED_PARQUET_DIR,
         "tpch_uniform": TPCH_UNIFORM_PARQUET_DIR,
+        "imdb": IMDB_PARQUET_DIR,
     }.get(db)
     if _parquet_dir is not None:
         tables = {}
