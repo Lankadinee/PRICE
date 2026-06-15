@@ -21,7 +21,7 @@ torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 torch.cuda.manual_seed_all(SEED)
 
-TEST_LIST = ['stats']
+TEST_LIST = os.environ.get('PRICE_TEST_LIST', 'imdb').split(',')
 
 args = get_args()
 print(args)

@@ -53,7 +53,66 @@ def load_tbls_cols_types(folder_path, db):
     print(tbls_cols_types)     
     return tbls_cols_types, decimal_tbls_cols
 
+TPCH_SKEWED_PARQUET_DIR = "/home/student.unimelb.edu.au/lrathuwadu/cardinality-estimation-data/original_data/tpch_skewed"
+TPCH_UNIFORM_PARQUET_DIR = "/home/student.unimelb.edu.au/lrathuwadu/cardinality-estimation-data/original_data/tpch_uniform_sf1"
+
+# Free-text / admin columns to drop from every table before any stats/feature
+# work. None of these are referenced by the TPC-H workloads we run.
+_DROP_COLS = {
+    "lineitem": ["l_comment"],
+    "orders":   ["o_comment", "o_clerk"],
+    "customer": ["c_comment", "c_name", "c_address", "c_phone"],
+    "part":     ["p_comment", "p_name"],
+    "supplier": ["s_comment", "s_name", "s_address", "s_phone"],
+    "partsupp": ["ps_comment"],
+    "nation":   ["n_comment"],
+    "region":   ["r_comment"],
+}
+
+
+def _load_parquet_table(parquet_path, tbl_dtypes, drop_cols=None):
+    """Load a parquet file and coerce dtypes to match the postgres schema.
+    Datetime columns get converted to int64 epoch days (matches schema bigint)."""
+    df = pd.read_parquet(parquet_path)
+    if drop_cols:
+        df = df.drop(columns=[c for c in drop_cols if c in df.columns])
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            epoch_days = (df[col].astype('datetime64[ns]').astype('int64') // (10 ** 9 * 86400))
+            df[col] = epoch_days.astype(pd.Int64Dtype())
+    if tbl_dtypes:
+        for col, dt in tbl_dtypes.items():
+            if col in df.columns:
+                try:
+                    df[col] = df[col].astype(dt)
+                except (TypeError, ValueError):
+                    pass
+    return df
+
+
 def load_table_datas(folder_path, db, abbrev, tbls_cols_types):
+    _parquet_dir = {
+        "tpch_skewed": TPCH_SKEWED_PARQUET_DIR,
+        "tpch_uniform": TPCH_UNIFORM_PARQUET_DIR,
+    }.get(db)
+    if _parquet_dir is not None:
+        tables = {}
+        print(f"loading parquet tables from {_parquet_dir}")
+        for tablename in abbrev:
+            path = f"{_parquet_dir}/{tablename}.parquet"
+            assert os.path.exists(path), f"missing parquet: {path}"
+            table = _load_parquet_table(
+                path,
+                tbls_cols_types.get(tablename),
+                drop_cols=_DROP_COLS.get(tablename),
+            )
+            print(
+                f"load table: {tablename} as {abbrev[tablename]}  rows={len(table)} "
+                f"cols={list(table.columns)}"
+            )
+            tables[abbrev[tablename]] = table
+        return tables
+
     load_file = f"{folder_path}/datasets/{db}/postgres_create_{db}.sql"
     tables = {}
     print("load table info from " + load_file)
@@ -64,8 +123,8 @@ def load_table_datas(folder_path, db, abbrev, tbls_cols_types):
                 filename = line.split(' ')[3].strip("'")
                 path = f"{folder_path}/datasets/{db}/{filename}"
                 assert os.path.exists(path)
-                table = pd.read_csv(path, sep='|', quotechar='"', escapechar='\\', dtype=tbls_cols_types[tablename], keep_default_na=False, na_values=['NULL'])  
-                
+                table = pd.read_csv(path, sep='|', quotechar='"', escapechar='\\', dtype=tbls_cols_types[tablename], keep_default_na=False, na_values=['NULL'])
+
                 assert tablename not in tables
                 assert tablename in abbrev
 

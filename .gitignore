@@ -163,3 +163,6 @@ datas/datasets/
 datas/datasets.tar.gz
 setup/features/
 results/*.sql
+*.pkl
+*.sql
+*.pth
